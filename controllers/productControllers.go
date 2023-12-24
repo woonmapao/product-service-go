@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/woonmapao/product-service-go/initializer"
@@ -98,28 +99,48 @@ func GetAllProducts(c *gin.Context) {
 	// Return a JSON response with the list of products
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.CreateSuccessResponseForMultipleProducts(products)
+		responses.CreateSuccessResponseForMultipleProducts(products),
 	)
 }
 
 func GetProductByID(c *gin.Context) {
 	// Extract product ID from the request parameters
-	id := c.Param("id")
+	productID := c.Param("id")
 
-	// Query the database for the product with the specified ID
-	var product models.Product
-	err := initializer.DB.First(&product, id).Error
+	// Convert product ID to integer (validations)
+	id, err := strconv.Atoi(productID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Product not found",
-		})
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid product ID",
+			}))
 		return
 	}
 
-	// Return a JSON response with the product details
-	c.JSON(http.StatusOK, gin.H{
-		"product": product,
-	})
+	// Get the product from the database
+	var product models.Product
+	err = initializer.DB.First(&product, id).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to fetch product",
+			}))
+		return
+	}
+
+	// Check if the product was not found
+	if product == (models.Product{}) {
+		c.JSON(http.StatusNotFound,
+			responses.CreateErrorResponse([]string{
+				"Product not found",
+			}))
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK,
+		responses.CreateSuccessResponse(&product),
+	)
 }
 
 func UpdateProduct(c *gin.Context) {
