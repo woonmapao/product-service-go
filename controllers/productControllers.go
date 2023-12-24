@@ -231,19 +231,49 @@ func UpdateProduct(c *gin.Context) {
 
 func DeleteProduct(c *gin.Context) {
 	// Extract product ID from the request parameters
-	id := c.Param("id")
+	productID := c.Param("id")
 
-	// Delete the product from the database
-	err := initializer.DB.Delete(&models.Product{}, id).Error
+	// Convert product ID to integer (validations)
+	id, err := strconv.Atoi(productID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete product",
-		})
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid product ID",
+			}))
 		return
 	}
 
-	// Return a JSON response indicating success
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-	})
+	// Check if the product with the given ID exists
+	var product models.Product
+	err = initializer.DB.First(&product, id).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to fetch product",
+			}))
+		return
+	}
+
+	if product == (models.Product{}) {
+		c.JSON(http.StatusNotFound,
+			responses.CreateErrorResponse([]string{
+				"Product not found",
+			}))
+		return
+	}
+
+	// Delete the product
+	err = initializer.DB.Delete(&models.Product{}, id).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to delete product",
+			}))
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK,
+		responses.DeleteSuccessResponse(),
+	)
 }

@@ -23,6 +23,14 @@ func CreateSuccessResponse(product *models.Product) gin.H {
 	}
 }
 
+func DeleteSuccessResponse() gin.H {
+	return gin.H{
+		"status":  "success",
+		"message": "Product added successfully",
+		"data":    gin.H{},
+	}
+}
+
 // CreateErrorResponseForProduct formats the error response for product services
 func CreateErrorResponse(errors []string) gin.H {
 	return gin.H{
