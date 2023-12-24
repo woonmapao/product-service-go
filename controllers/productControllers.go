@@ -145,10 +145,20 @@ func GetProductByID(c *gin.Context) {
 
 func UpdateProduct(c *gin.Context) {
 	// Extract product ID from the request parameters
-	id := c.Param("id")
+	productID := c.Param("id")
+
+	// Convert product ID to integer (validations)
+	id, err := strconv.Atoi(productID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid product ID",
+			}))
+		return
+	}
 
 	// Extract updated product data from the request body
-	var updatedProductData struct {
+	var updateData struct {
 		Name          string  `json:"name" binding:"required"`
 		Category      string  `json:"category" binding:"required"`
 		Price         float64 `json:"price" binding:"required,gt=0"`
@@ -157,57 +167,66 @@ func UpdateProduct(c *gin.Context) {
 		ReorderLevel  int     `json:"reorderLevel" binding:"required,gte=0,ltfield=StockQuantity"`
 	}
 
-	err := c.ShouldBindJSON(&updatedProductData)
+	err = c.ShouldBindJSON(&updateData)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid request format",
+			}))
 		return
 	}
 
-	// Validate the input data
-
-	// Check if the product exists
-	var existingProduct models.Product
-	err = initializer.DB.First(&existingProduct, id).Error
+	// Check if the product with the given ID exists
+	var product models.Product
+	err = initializer.DB.First(&product, id).Error
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Product not found",
-		})
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to fetch product",
+			}))
 		return
 	}
 
 	// Check if the updated product name is unique
-	isDuplicate := validators.IsProductNameDuplicate(updatedProductData.Name)
-	if isDuplicate {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Product with this name already exists",
-		})
+	if product == (models.Product{}) {
+		c.JSON(http.StatusNotFound,
+			responses.CreateErrorResponse([]string{
+				"Product not found:",
+			}))
 		return
 	}
 
-	// Check if stock quantity is greater than or equal to reorder level
-	if updatedProductData.StockQuantity < updatedProductData.ReorderLevel {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Stock quantity must be greater than or equal to reorder level",
-		})
+	// Validate stock quantity
+	if !validations.ValidateStockQuantity(c, updateData.StockQuantity, updateData.ReorderLevel) {
+		c.JSON(http.StatusConflict,
+			responses.CreateErrorResponse([]string{
+				"Stock quantity must be greater than or equal to reorder level",
+			}))
 		return
 	}
 
-	// Update the product in the database
-	initializer.DB.Model(&existingProduct).Updates(models.Product{
-		Name:          updatedProductData.Name,
-		Category:      updatedProductData.Category,
-		Price:         updatedProductData.Price,
-		Description:   updatedProductData.Description,
-		StockQuantity: updatedProductData.StockQuantity,
-		ReorderLevel:  updatedProductData.ReorderLevel,
-	})
+	// Update product fields
+	product.Name = updateData.Name
+	product.Category = updateData.Category
+	product.Price = updateData.Price
+	product.Description = updateData.Description
+	product.StockQuantity = updateData.StockQuantity
+	product.ReorderLevel = updateData.ReorderLevel
 
-	// Return a JSON response with the updated product
-	c.JSON(http.StatusOK, gin.H{
-		"updatedProduct": existingProduct,
-	})
+	// Save the updated product to the database
+	err = initializer.DB.Save(&product).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to update product",
+			}))
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK,
+		responses.CreateSuccessResponse(&product),
+	)
 }
 
 func DeleteProduct(c *gin.Context) {
