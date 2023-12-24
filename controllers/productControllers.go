@@ -73,21 +73,33 @@ func CreateProduct(c *gin.Context) {
 	)
 }
 
+// Retrieve all products from the database
 func GetAllProducts(c *gin.Context) {
-	// Retrieve products from the database
+
 	var products []models.Product
 	err := initializer.DB.Find(&products).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch products",
-		})
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to fetch products",
+			}))
+		return
+	}
+
+	// Check if no products were found
+	if len(products) == 0 {
+		c.JSON(http.StatusNotFound,
+			responses.CreateErrorResponse([]string{
+				"No products found",
+			}))
 		return
 	}
 
 	// Return a JSON response with the list of products
-	c.JSON(http.StatusOK, gin.H{
-		"products": products,
-	})
+	// Return success response
+	c.JSON(http.StatusOK,
+		responses.CreateSuccessResponseForMultipleProducts(products)
+	)
 }
 
 func GetProductByID(c *gin.Context) {
