@@ -33,3 +33,26 @@ func CreateErrorResponse(errors []string) gin.H {
 		},
 	}
 }
+
+func CreateSuccessResponseForMultipleProducts(products []models.Product) gin.H {
+	productList := make([]map[string]interface{}, len(products))
+	for _, product := range products {
+		productList = append(productList, gin.H{
+			"id":            product.ID,
+			"name":          product.Name,
+			"category":      product.Category,
+			"price":         product.Price,
+			"description":   product.Description,
+			"stockQuantity": product.StockQuantity,
+			"reorderLevel":  product.ReorderLevel,
+		})
+	}
+
+	return gin.H{
+		"status":  "success",
+		"message": "Products retrieved successfully",
+		"data": gin.H{
+			"products": productList,
+		},
+	}
+}
