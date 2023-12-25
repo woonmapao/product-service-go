@@ -2,21 +2,13 @@ package initializer
 
 import (
 	"log"
-	"os"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/joho/godotenv"
 )
 
-var DB *gorm.DB
-
-func DBInitializer() {
-
-	dsn := os.Getenv("DB_URL")
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+func LoadEnvVariables() {
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error loading .env files")
 	}
-
-	DB = db
 }
