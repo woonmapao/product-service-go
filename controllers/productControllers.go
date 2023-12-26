@@ -17,10 +17,10 @@ func AddProduct(c *gin.Context) {
 	var productData struct {
 		Name          string  `json:"name" binding:"required"`
 		Category      string  `json:"category" binding:"required"`
-		Price         float64 `json:"price" binding:"required"`
+		Price         float64 `json:"price" binding:"required,gt=0"`
 		Description   string  `json:"description" binding:"required"`
-		StockQuantity int     `json:"stockQuantity" binding:"required"`
-		ReorderLevel  int     `json:"reorderLevel" binding:"required"`
+		StockQuantity int     `json:"stockQuantity" binding:"required,gte=0"`
+		ReorderLevel  int     `json:"reorderLevel" binding:"required,gte=0,ltfield=StockQuantity"`
 	}
 	err := c.ShouldBindJSON(&productData)
 	if err != nil {
@@ -65,7 +65,7 @@ func AddProduct(c *gin.Context) {
 	}
 
 	// Validate stock quantity
-	if !validations.ValidateStockQuantity(productData.StockQuantity, productData.ReorderLevel, tx) {
+	if !validations.ValidateStockQuantity(productData.StockQuantity, productData.ReorderLevel) {
 		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
@@ -122,6 +122,7 @@ func GetAllProducts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch products",
+				err.Error(),
 			}))
 		return
 	}
@@ -135,7 +136,6 @@ func GetAllProducts(c *gin.Context) {
 		return
 	}
 
-	// Return a JSON response with the list of products
 	// Return success response
 	c.JSON(http.StatusOK,
 		responses.CreateSuccessResponseForMultipleProducts(products),
@@ -152,6 +152,7 @@ func GetProductByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
 				"Invalid product ID",
+				err.Error(),
 			}))
 		return
 	}
@@ -163,6 +164,7 @@ func GetProductByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch product",
+				err.Error(),
 			}))
 		return
 	}
@@ -192,6 +194,7 @@ func UpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
 				"Invalid product ID",
+				err.Error(),
 			}))
 		return
 	}
@@ -201,32 +204,53 @@ func UpdateProduct(c *gin.Context) {
 		Name          string  `json:"name" binding:"required"`
 		Category      string  `json:"category" binding:"required"`
 		Price         float64 `json:"price" binding:"required,gt=0"`
-		Description   string  `json:"description"`
+		Description   string  `json:"description" binding:"required"`
 		StockQuantity int     `json:"stockQuantity" binding:"required,gte=0"`
 		ReorderLevel  int     `json:"reorderLevel" binding:"required,gte=0,ltfield=StockQuantity"`
 	}
-
 	err = c.ShouldBindJSON(&updateData)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
 				"Invalid request format",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Check for empty values
+	if updateData.Name == "" || updateData.Category == "" ||
+		updateData.Price == 0.0 || updateData.Description == "" ||
+		updateData.StockQuantity == 0 || updateData.ReorderLevel == 0 {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Name, Category, Price, Description, StockQuantity, and ReorderLevel are required fields",
+			}))
+		return
+	}
+
+	// Start a transaction
+	tx := initializer.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to begin transaction",
+				tx.Error.Error(),
 			}))
 		return
 	}
 
 	// Check if the product with the given ID exists
 	var product models.Product
-	err = initializer.DB.First(&product, id).Error
+	err = tx.First(&product, id).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch product",
+				err.Error(),
 			}))
 		return
 	}
-
-	// Check if the updated product name is unique
 	if product == (models.Product{}) {
 		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
@@ -236,7 +260,7 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	// Validate stock quantity
-	if !validations.ValidateStockQuantity(c, updateData.StockQuantity, updateData.ReorderLevel) {
+	if !validations.ValidateStockQuantity(updateData.StockQuantity, updateData.ReorderLevel) {
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
 				"Stock quantity must be greater than or equal to reorder level",
@@ -253,18 +277,31 @@ func UpdateProduct(c *gin.Context) {
 	product.ReorderLevel = updateData.ReorderLevel
 
 	// Save the updated product to the database
-	err = initializer.DB.Save(&product).Error
+	err = tx.Save(&product).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to update product",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Commit the transaction and check for commit errors
+	err = tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to commit transaction",
+				err.Error(),
 			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.CreateSuccessResponse(&product),
+		responses.UpdateSuccessResponse(&product),
 	)
 }
 
@@ -278,21 +315,33 @@ func DeleteProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
 				"Invalid product ID",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Start a transaction
+	tx := initializer.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to begin transaction",
+				tx.Error.Error(),
 			}))
 		return
 	}
 
 	// Check if the product with the given ID exists
 	var product models.Product
-	err = initializer.DB.First(&product, id).Error
+	err = tx.First(&product, id).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch product",
+				err.Error(),
 			}))
 		return
 	}
-
 	if product == (models.Product{}) {
 		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
@@ -302,17 +351,18 @@ func DeleteProduct(c *gin.Context) {
 	}
 
 	// Delete the product
-	err = initializer.DB.Delete(&models.Product{}, id).Error
+	err = tx.Delete(&models.Product{}, id).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to delete product",
+				err.Error(),
 			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.DeleteSuccessResponse(),
+		responses.DeleteSuccessResponse(&product),
 	)
 }

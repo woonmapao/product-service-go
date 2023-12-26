@@ -11,6 +11,6 @@ func IsProductNameDuplicate(name string, tx *gorm.DB) bool {
 	return err == nil
 }
 
-func ValidateStockQuantity(stockQuantity, reorderLevel int, tx *gorm.DB) bool {
+func ValidateStockQuantity(stockQuantity, reorderLevel int) bool {
 	return stockQuantity >= reorderLevel
 }
