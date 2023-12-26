@@ -65,7 +65,7 @@ func AddProduct(c *gin.Context) {
 	}
 
 	// Validate stock quantity
-	if !validations.ValidateStockQuantity(c, productData.StockQuantity, productData.ReorderLevel) {
+	if !validations.ValidateStockQuantity(productData.StockQuantity, productData.ReorderLevel, tx) {
 		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{

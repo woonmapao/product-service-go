@@ -1,15 +1,16 @@
 package validations
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/woonmapao/product-service-go/models"
 	"gorm.io/gorm"
 )
 
-func IsProductNameDuplicate(prodName string, tx *gorm.DB) bool {
-	return false
+func IsProductNameDuplicate(name string, tx *gorm.DB) bool {
+	var product models.Product
+	err := tx.Where("name = ?", name).First(&product).Error
+	return err == nil
 }
 
-// ValidateStockQuantity checks if stock quantity is greater than or equal to reorder level
-func ValidateStockQuantity(c *gin.Context, stock, reorder int) bool {
-	return stock >= reorder
+func ValidateStockQuantity(stockQuantity, reorderLevel int, tx *gorm.DB) bool {
+	return stockQuantity >= reorderLevel
 }
