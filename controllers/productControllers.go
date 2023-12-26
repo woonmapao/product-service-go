@@ -56,7 +56,6 @@ func AddProduct(c *gin.Context) {
 
 	// Check for duplicate product name
 	if validations.IsProductNameDuplicate(productData.Name, tx) {
-		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
 				"Product name is already taken",
@@ -66,7 +65,6 @@ func AddProduct(c *gin.Context) {
 
 	// Validate stock quantity
 	if !validations.ValidateStockQuantity(productData.StockQuantity, productData.ReorderLevel) {
-		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
 				"Stock quantity must be greater than or equal to reorder level",
@@ -244,6 +242,7 @@ func UpdateProduct(c *gin.Context) {
 	var product models.Product
 	err = tx.First(&product, id).Error
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch product",
@@ -255,6 +254,15 @@ func UpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
 				"Product not found:",
+			}))
+		return
+	}
+
+	// Check for duplicate product name
+	if validations.IsProductNameDuplicate(updateData.Name, tx) {
+		c.JSON(http.StatusConflict,
+			responses.CreateErrorResponse([]string{
+				"Product name is already taken",
 			}))
 		return
 	}
@@ -279,6 +287,7 @@ func UpdateProduct(c *gin.Context) {
 	// Save the updated product to the database
 	err = tx.Save(&product).Error
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to update product",
@@ -335,6 +344,7 @@ func DeleteProduct(c *gin.Context) {
 	var product models.Product
 	err = tx.First(&product, id).Error
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to fetch product",
@@ -353,9 +363,22 @@ func DeleteProduct(c *gin.Context) {
 	// Delete the product
 	err = tx.Delete(&models.Product{}, id).Error
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to delete product",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Commit the transaction and check for commit errors
+	err = tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to commit transaction",
 				err.Error(),
 			}))
 		return
