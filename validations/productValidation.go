@@ -2,9 +2,10 @@ package validations
 
 import (
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func IsProductNameDuplicate(yo string) bool {
+func IsProductNameDuplicate(prodName string, tx *gorm.DB) bool {
 	return false
 }
 

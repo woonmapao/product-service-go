@@ -11,28 +11,52 @@ import (
 	"github.com/woonmapao/product-service-go/validations"
 )
 
-func CreateProduct(c *gin.Context) {
+func AddProduct(c *gin.Context) {
+
 	// Extract product data from the request body
 	var productData struct {
-		Name          string  `json:"name"`
-		Category      string  `json:"category"`
-		Price         float64 `json:"price"`
-		Description   string  `json:"description"`
-		StockQuantity int     `json:"stockQuantity"`
-		ReorderLevel  int     `json:"reorderLevel"`
+		Name          string  `json:"name" binding:"required"`
+		Category      string  `json:"category" binding:"required"`
+		Price         float64 `json:"price" binding:"required"`
+		Description   string  `json:"description" binding:"required"`
+		StockQuantity int     `json:"stockQuantity" binding:"required"`
+		ReorderLevel  int     `json:"reorderLevel" binding:"required"`
 	}
-
 	err := c.ShouldBindJSON(&productData)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
 				"Invalid request format",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Check for empty values
+	if productData.Name == "" || productData.Category == "" ||
+		productData.Price == 0.0 || productData.Description == "" ||
+		productData.StockQuantity == 0 || productData.ReorderLevel == 0 {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Name, Category, Price, Description, StockQuantity, and ReorderLevel are required fields",
+			}))
+		return
+	}
+
+	// Start a transaction
+	tx := initializer.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to begin transaction",
+				tx.Error.Error(),
 			}))
 		return
 	}
 
 	// Check for duplicate product name
-	if validations.IsProductNameDuplicate(productData.Name) {
+	if validations.IsProductNameDuplicate(productData.Name, tx) {
+		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
 				"Product name is already taken",
@@ -42,6 +66,7 @@ func CreateProduct(c *gin.Context) {
 
 	// Validate stock quantity
 	if !validations.ValidateStockQuantity(c, productData.StockQuantity, productData.ReorderLevel) {
+		tx.Rollback()
 		c.JSON(http.StatusConflict,
 			responses.CreateErrorResponse([]string{
 				"Stock quantity must be greater than or equal to reorder level",
@@ -59,11 +84,25 @@ func CreateProduct(c *gin.Context) {
 		ReorderLevel:  productData.ReorderLevel,
 	}
 
-	err = initializer.DB.Create(&product).Error
+	err = tx.Create(&product).Error
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to create product",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Commit the transaction and check for commit errors
+	err = tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to commit transaction",
+				err.Error(),
 			}))
 		return
 	}
