@@ -13,5 +13,6 @@ func SetupProductRoutes(router *gin.Engine) {
 		productGroup.GET("/:id", controllers.GetProductByID)
 		productGroup.PUT("/:id", controllers.UpdateProduct)
 		productGroup.DELETE("/:id", controllers.DeleteProduct)
+		productGroup.PUT("/update-stock/:id", controllers.UpdateStock)
 	}
 }
