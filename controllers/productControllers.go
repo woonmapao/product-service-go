@@ -389,3 +389,95 @@ func DeleteProduct(c *gin.Context) {
 		responses.DeleteSuccessResponse(&product),
 	)
 }
+
+func UpdateStock(c *gin.Context) {
+
+	// Extract product ID from the request parameters
+	productID := c.Param("id")
+
+	// Convert product ID to integer (validations)
+	id, err := strconv.Atoi(productID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid product ID",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Extract updated product data from the request body
+	var body struct {
+		Quantity int `json:"quantity"`
+	}
+	err = c.ShouldBindJSON(&body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"Invalid request format",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Start a transaction
+	tx := initializer.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to begin transaction",
+				tx.Error.Error(),
+			}))
+		return
+	}
+
+	// Check if the product with the given ID exists
+	var product models.Product
+	err = tx.First(&product, id).Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to fetch product",
+				err.Error(),
+			}))
+		return
+	}
+	if product == (models.Product{}) {
+		c.JSON(http.StatusNotFound,
+			responses.CreateErrorResponse([]string{
+				"Product not found:",
+			}))
+		return
+	}
+
+	newStock := product.StockQuantity - body.Quantity
+
+	err = tx.Model(&product).Update("StockQuantity", newStock).Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to update stock quantity",
+				err.Error(),
+			}))
+	}
+
+	// Commit the transaction and check for commit errors
+	err = tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"Failed to commit transaction",
+				err.Error(),
+			}))
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK,
+		responses.UpdateSuccessResponse(&product),
+	)
+
+}
