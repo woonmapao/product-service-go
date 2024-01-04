@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/woonmapao/product-service-go/controllers"
 	"github.com/woonmapao/product-service-go/initializer"
 	"github.com/woonmapao/product-service-go/models"
 	"github.com/woonmapao/product-service-go/responses"
@@ -13,93 +14,59 @@ import (
 
 func AddProduct(c *gin.Context) {
 
-	// Extract product data from the request body
-	var productData struct {
-		Name          string  `json:"name" binding:"required"`
-		Category      string  `json:"category" binding:"required"`
-		Price         float64 `json:"price" binding:"required,gt=0"`
-		Description   string  `json:"description" binding:"required"`
-		StockQuantity int     `json:"stockQuantity" binding:"required,gte=0"`
-		ReorderLevel  int     `json:"reorderLevel" binding:"required,gte=0,ltfield=StockQuantity"`
-	}
-	err := c.ShouldBindJSON(&productData)
+	// Get data from request body
+	var body models.ProductRequest
+	err := controllers.BindAndValidate(c, &body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid request format",
 				err.Error(),
 			}))
 		return
 	}
 
-	// Check for empty values
-	if productData.Name == "" || productData.Category == "" ||
-		productData.Price == 0.0 || productData.Description == "" ||
-		productData.StockQuantity == 0 || productData.ReorderLevel == 0 {
+	// Start a transaction
+	tx, err := controllers.StartTrx(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				"there is a problem",
+			}))
+		return
+	}
+
+	// Check if product valid
+	valid, err := validations.IsValidProduct(body.Name, body.StockQuantity, body.ReorderLevel, tx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
+				err.Error(),
+			}))
+		return
+	}
+	if !valid {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Name, Category, Price, Description, StockQuantity, and ReorderLevel are required fields",
+				"item not valid",
 			}))
 		return
 	}
 
-	// Start a transaction
-	tx := initializer.DB.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to begin transaction",
-				tx.Error.Error(),
-			}))
-		return
-	}
-
-	// Check for duplicate product name
-	if validations.IsProductNameDuplicate(productData.Name, tx) {
-		c.JSON(http.StatusConflict,
-			responses.CreateErrorResponse([]string{
-				"Product name is already taken",
-			}))
-		return
-	}
-
-	// Validate stock quantity
-	if !validations.ValidateStockQuantity(productData.StockQuantity, productData.ReorderLevel) {
-		c.JSON(http.StatusConflict,
-			responses.CreateErrorResponse([]string{
-				"Stock quantity must be greater than or equal to reorder level",
-			}))
-		return
-	}
-
-	// Create product in the database
-	product := models.Product{
-		Name:          productData.Name,
-		Category:      productData.Category,
-		Price:         productData.Price,
-		Description:   productData.Description,
-		StockQuantity: productData.StockQuantity,
-		ReorderLevel:  productData.ReorderLevel,
-	}
-
-	err = tx.Create(&product).Error
+	// Add product to database
+	err = controllers.AddProduct(&body, tx)
 	if err != nil {
-		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
-				"Failed to create product",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Commit the transaction and check for commit errors
-	err = tx.Commit().Error
+	err = controllers.CommitTrx(c, tx)
 	if err != nil {
-		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
-				"Failed to commit transaction",
 				err.Error(),
 			}))
 		return
@@ -107,7 +74,7 @@ func AddProduct(c *gin.Context) {
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.CreateSuccessResponse(&product),
+		responses.CreateSuccess(),
 	)
 }
 
