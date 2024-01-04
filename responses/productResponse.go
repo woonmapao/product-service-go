@@ -5,21 +5,10 @@ import (
 	"github.com/woonmapao/product-service-go/models"
 )
 
-func CreateSuccessResponse(product *models.Product) gin.H {
+func CreateSuccess() gin.H {
 	return gin.H{
 		"status":  "success",
-		"message": "Product added successfully",
-		"data": gin.H{
-			"product": gin.H{
-				"id":            product.ID,
-				"name":          product.Name,
-				"category":      product.Category,
-				"price":         product.Price,
-				"description":   product.Description,
-				"stockQuantity": product.StockQuantity,
-				"reorderLevel":  product.ReorderLevel,
-			},
-		},
+		"message": "product added successfully",
 	}
 }
 

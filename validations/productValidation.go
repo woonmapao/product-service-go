@@ -1,16 +1,20 @@
 package validations
 
 import (
+	"errors"
+
 	"github.com/woonmapao/product-service-go/models"
 	"gorm.io/gorm"
 )
 
-func IsProductNameDuplicate(name string, tx *gorm.DB) bool {
-	var product models.Product
-	err := tx.Where("name = ?", name).First(&product).Error
-	return err == nil
-}
+func IsValidProduct(name string, stock, reorder int, tx *gorm.DB) (bool, error) {
 
-func ValidateStockQuantity(stockQuantity, reorderLevel int) bool {
-	return stockQuantity >= reorderLevel
+	var p models.Product
+	err := tx.Where("name = ?", name).First(&p).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return false, errors.New("failed to validate")
+	}
+	// Return if stock is valid and no duplicate name
+	return stock > reorder && err == gorm.ErrRecordNotFound, nil
+
 }

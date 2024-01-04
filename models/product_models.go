@@ -8,11 +8,20 @@ type Product struct {
 	Category      string  `json:"category"`
 	Price         float64 `json:"price"`
 	Description   string  `json:"description"`
-	StockQuantity int     `json:"stockQuantity"`
-	ReorderLevel  int     `json:"reorderLevel"`
+	StockQuantity int     `json:"stock_quantity"`
+	ReorderLevel  int     `json:"reorder_level"`
+}
+
+type ProductRequest struct {
+	Name          string  `json:"name"`
+	Category      string  `json:"category"`
+	Price         float64 `json:"price"`
+	Description   string  `json:"description"`
+	StockQuantity int     `json:"stock_quantity"`
+	ReorderLevel  int     `json:"reorder_level"`
 }
 
 type ProductPurchase struct {
-	ProductID int `json:"productId"`
+	ProductID int `json:"product_id"`
 	Quantity  int `json:"quantity"`
 }
