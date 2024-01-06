@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/woonmapao/product-service-go/initializer"
@@ -84,4 +85,26 @@ func GetProducts(db *gorm.DB) (*[]models.Product, error) {
 		return &products, errors.New("no products found")
 	}
 	return &products, nil
+}
+
+func GetID(c *gin.Context) (int, error) {
+
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return 0, errors.New("invalid product id")
+	}
+	return id, nil
+}
+
+func GetProduct(id int, db *gorm.DB) (*models.Product, error) {
+
+	var product models.Product
+	err := db.First(&product, id).Error
+	if err == gorm.ErrRecordNotFound {
+		return &product, errors.New("product not found")
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return &product, errors.New("something went wrong")
+	}
+	return &product, nil
 }

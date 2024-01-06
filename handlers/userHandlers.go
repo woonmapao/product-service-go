@@ -96,45 +96,29 @@ func GetProductsHandler(c *gin.Context) {
 	)
 }
 
-func GetProductByID(c *gin.Context) {
-	// Extract product ID from the request parameters
-	productID := c.Param("id")
+func GetProductHandler(c *gin.Context) {
 
-	// Convert product ID to integer (validations)
-	id, err := strconv.Atoi(productID)
+	id, err := controllers.GetID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
-			responses.CreateErrorResponse([]string{
-				"Invalid product ID",
+			responses.GetError([]string{
 				err.Error(),
 			}))
 		return
 	}
 
-	// Get the product from the database
-	var product models.Product
-	err = initializer.DB.First(&product, id).Error
+	product, err := controllers.GetProduct(id, initializer.DB)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to fetch product",
-				err.Error(),
-			}))
-		return
-	}
-
-	// Check if the product was not found
-	if product == (models.Product{}) {
 		c.JSON(http.StatusNotFound,
-			responses.CreateErrorResponse([]string{
-				"Product not found",
+			responses.GetError([]string{
+				err.Error(),
 			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.CreateSuccessResponse(&product),
+		responses.GetSuccess(product),
 	)
 }
 

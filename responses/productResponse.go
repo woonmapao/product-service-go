@@ -22,6 +22,24 @@ func GetError(errors []string) gin.H {
 	}
 }
 
+func GetSuccess(product *models.Product) gin.H {
+	return gin.H{
+		"status":  "success",
+		"message": "product retrieved successfully",
+		"data": gin.H{
+			"product": gin.H{
+				"id":            product.ID,
+				"name":          product.Name,
+				"category":      product.Category,
+				"price":         product.Price,
+				"description":   product.Description,
+				"stockQuantity": product.StockQuantity,
+				"reorderLevel":  product.ReorderLevel,
+			},
+		},
+	}
+}
+
 func UpdateSuccessResponse(product *models.Product) gin.H {
 	return gin.H{
 		"status":  "success",
