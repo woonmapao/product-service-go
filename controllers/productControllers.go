@@ -72,3 +72,16 @@ func CommitTrx(c *gin.Context, tx *gorm.DB) error {
 	}
 	return nil
 }
+
+func GetProducts(db *gorm.DB) (*[]models.Product, error) {
+
+	var products []models.Product
+	err := db.Find(&products).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return &products, errors.New("failed to fetch user")
+	}
+	if err == gorm.ErrRecordNotFound {
+		return &products, errors.New("no products found")
+	}
+	return &products, nil
+}

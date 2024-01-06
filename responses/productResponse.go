@@ -12,6 +12,16 @@ func CreateSuccess() gin.H {
 	}
 }
 
+func GetError(errors []string) gin.H {
+	return gin.H{
+		"status":  "error",
+		"message": "failed to fetch",
+		"data": gin.H{
+			"errors": errors,
+		},
+	}
+}
+
 func UpdateSuccessResponse(product *models.Product) gin.H {
 	return gin.H{
 		"status":  "success",
@@ -59,10 +69,11 @@ func CreateErrorResponse(errors []string) gin.H {
 	}
 }
 
-func CreateSuccessResponseForMultipleProducts(products []models.Product) gin.H {
-	productList := make([]map[string]interface{}, len(products))
-	for _, product := range products {
-		productList = append(productList, gin.H{
+func GetProductsSuccess(productList []models.Product) gin.H {
+
+	products := make([]gin.H, len(productList))
+	for i, product := range productList {
+		products[i] = map[string]interface{}{
 			"id":            product.ID,
 			"name":          product.Name,
 			"category":      product.Category,
@@ -70,14 +81,13 @@ func CreateSuccessResponseForMultipleProducts(products []models.Product) gin.H {
 			"description":   product.Description,
 			"stockQuantity": product.StockQuantity,
 			"reorderLevel":  product.ReorderLevel,
-		})
+		}
 	}
-
 	return gin.H{
 		"status":  "success",
-		"message": "Products retrieved successfully",
+		"message": "products retrieved successfully",
 		"data": gin.H{
-			"products": productList,
+			"products": products,
 		},
 	}
 }
