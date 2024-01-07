@@ -40,21 +40,10 @@ func GetSuccess(product *models.Product) gin.H {
 	}
 }
 
-func UpdateSuccessResponse(product *models.Product) gin.H {
+func UpdateSuccess() gin.H {
 	return gin.H{
 		"status":  "success",
-		"message": "Product updated successfully",
-		"data": gin.H{
-			"product": gin.H{
-				"id":            product.ID,
-				"name":          product.Name,
-				"category":      product.Category,
-				"price":         product.Price,
-				"description":   product.Description,
-				"stockQuantity": product.StockQuantity,
-				"reorderLevel":  product.ReorderLevel,
-			},
-		},
+		"message": "product updated successfully",
 	}
 }
 

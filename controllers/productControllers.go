@@ -108,3 +108,21 @@ func GetProduct(id int, db *gorm.DB) (*models.Product, error) {
 	}
 	return &product, nil
 }
+
+func UpdateProduct(update *models.ProductRequest, exist *models.Product, tx *gorm.DB) error {
+
+	exist = &models.Product{
+		Name:          update.Name,
+		Category:      update.Category,
+		Price:         update.Price,
+		Description:   update.Description,
+		StockQuantity: update.StockQuantity,
+		ReorderLevel:  update.ReorderLevel,
+	}
+	err := tx.Save(&exist).Error
+	if err != nil {
+		tx.Rollback()
+		return errors.New("failed to update product")
+	}
+	return nil
+}

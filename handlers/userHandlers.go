@@ -122,135 +122,78 @@ func GetProductHandler(c *gin.Context) {
 	)
 }
 
-func UpdateProduct(c *gin.Context) {
-	// Extract product ID from the request parameters
-	productID := c.Param("id")
+func UpdateProductHandler(c *gin.Context) {
 
-	// Convert product ID to integer (validations)
-	id, err := strconv.Atoi(productID)
+	id, err := controllers.GetID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid product ID",
 				err.Error(),
 			}))
 		return
 	}
 
-	// Extract updated product data from the request body
-	var updateData struct {
-		Name          string  `json:"name" binding:"required"`
-		Category      string  `json:"category" binding:"required"`
-		Price         float64 `json:"price" binding:"required,gt=0"`
-		Description   string  `json:"description" binding:"required"`
-		StockQuantity int     `json:"stockQuantity" binding:"required,gte=0"`
-		ReorderLevel  int     `json:"reorderLevel" binding:"required,gte=0,ltfield=StockQuantity"`
-	}
-	err = c.ShouldBindJSON(&updateData)
+	var updData models.ProductRequest
+	err = controllers.BindAndValidate(c, &updData)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid request format",
 				err.Error(),
-			}))
-		return
-	}
-
-	// Check for empty values
-	if updateData.Name == "" || updateData.Category == "" ||
-		updateData.Price == 0.0 || updateData.Description == "" ||
-		updateData.StockQuantity == 0 || updateData.ReorderLevel == 0 {
-		c.JSON(http.StatusBadRequest,
-			responses.CreateErrorResponse([]string{
-				"Name, Category, Price, Description, StockQuantity, and ReorderLevel are required fields",
 			}))
 		return
 	}
 
 	// Start a transaction
-	tx := initializer.DB.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to begin transaction",
-				tx.Error.Error(),
-			}))
+	tx, err := controllers.StartTrx(c)
+	if err != nil {
 		return
 	}
 
-	// Check if the product with the given ID exists
-	var product models.Product
-	err = tx.First(&product, id).Error
+	// Find the updating user (validation)
+	exist, err := controllers.GetProduct(id, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
+		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
-				"Failed to fetch product",
 				err.Error(),
 			}))
 		return
 	}
-	if product == (models.Product{}) {
-		c.JSON(http.StatusNotFound,
-			responses.CreateErrorResponse([]string{
-				"Product not found:",
-			}))
-		return
-	}
 
-	// Check for duplicate product name
-	if validations.IsProductNameDuplicate(updateData.Name, tx) {
-		c.JSON(http.StatusConflict,
-			responses.CreateErrorResponse([]string{
-				"Product name is already taken",
-			}))
-		return
-	}
-
-	// Validate stock quantity
-	if !validations.ValidateStockQuantity(updateData.StockQuantity, updateData.ReorderLevel) {
-		c.JSON(http.StatusConflict,
-			responses.CreateErrorResponse([]string{
-				"Stock quantity must be greater than or equal to reorder level",
-			}))
-		return
-	}
-
-	// Update product fields
-	product.Name = updateData.Name
-	product.Category = updateData.Category
-	product.Price = updateData.Price
-	product.Description = updateData.Description
-	product.StockQuantity = updateData.StockQuantity
-	product.ReorderLevel = updateData.ReorderLevel
-
-	// Save the updated product to the database
-	err = tx.Save(&product).Error
+	// Check if product valid
+	valid, err := validations.IsValidProduct(updData.Name, updData.StockQuantity, updData.ReorderLevel, tx)
 	if err != nil {
-		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
-				"Failed to update product",
+				err.Error(),
+			}))
+		return
+	}
+	if !valid {
+		c.JSON(http.StatusBadRequest,
+			responses.CreateErrorResponse([]string{
+				"item not valid",
+			}))
+		return
+	}
+
+	err = controllers.UpdateProduct(&updData, exist, tx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			responses.CreateErrorResponse([]string{
 				err.Error(),
 			}))
 		return
 	}
 
 	// Commit the transaction and check for commit errors
-	err = tx.Commit().Error
+	err = controllers.CommitTrx(c, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to commit transaction",
-				err.Error(),
-			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.UpdateSuccessResponse(&product),
+		responses.UpdateSuccess(),
 	)
 }
 
