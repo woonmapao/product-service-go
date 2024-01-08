@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func BindAndValidate(c *gin.Context, body *models.ProductRequest) error {
+func BindAndValidate[T any](c *gin.Context, body *T) error {
 
 	err := c.ShouldBindJSON(&body)
 	if err != nil {
@@ -20,16 +21,10 @@ func BindAndValidate(c *gin.Context, body *models.ProductRequest) error {
 			"invalid request format",
 		)
 	}
-	if body.Name == "" ||
-		body.Category == "" ||
-		body.Price == 0 ||
-		body.Description == "" ||
-		body.StockQuantity == 0 ||
-		body.ReorderLevel == 0 {
-		return errors.New(
-			"missing fields",
-		)
+	if reflect.ValueOf(body).IsNil() {
+		return errors.New("missing fields")
 	}
+
 	return nil
 }
 
