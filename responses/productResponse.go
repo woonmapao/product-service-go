@@ -87,3 +87,10 @@ func GetProductsSuccess(productList []models.Product) gin.H {
 		},
 	}
 }
+
+func StockSuccess() gin.H {
+	return gin.H{
+		"status":  "success",
+		"message": "stock updated",
+	}
+}

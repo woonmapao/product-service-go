@@ -21,7 +21,6 @@ type ProductRequest struct {
 	ReorderLevel  int     `json:"reorder_level"`
 }
 
-type ProductPurchase struct {
-	ProductID int `json:"product_id"`
-	Quantity  int `json:"quantity"`
+type StockRequest struct {
+	Quantity int `json:"quantity"`
 }

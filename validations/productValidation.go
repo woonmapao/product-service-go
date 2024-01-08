@@ -18,3 +18,11 @@ func IsValidProduct(name string, stock, reorder int, tx *gorm.DB) (bool, error) 
 	return stock > reorder && err == gorm.ErrRecordNotFound, nil
 
 }
+
+func EnoughStock(want int, have int) (bool, error) {
+
+	if want > have {
+		return false, errors.New("not enough stock")
+	}
+	return true, nil
+}

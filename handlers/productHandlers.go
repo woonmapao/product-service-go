@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/woonmapao/product-service-go/controllers"
@@ -245,98 +244,73 @@ func DeleteProduct(c *gin.Context) {
 	)
 }
 
-func UpdateStock(c *gin.Context) {
+func UpdateStockHandler(c *gin.Context) {
 
-	// Extract product ID from the request parameters
-	productID := c.Param("id")
-
-	// Convert product ID to integer (validations)
-	id, err := strconv.Atoi(productID)
+	id, err := controllers.GetID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid product ID",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Extract updated product data from the request body
-	var body struct {
-		Quantity int `json:"quantity"`
-	}
-	err = c.ShouldBindJSON(&body)
+	var body models.StockRequest
+	err = controllers.BindAndValidate(c, &body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid request format",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Start a transaction
-	tx := initializer.DB.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to begin transaction",
-				tx.Error.Error(),
-			}))
+	tx, err := controllers.StartTrx(c)
+	if err != nil {
 		return
 	}
 
-	// Check if the product with the given ID exists
-	var product models.Product
-	err = tx.First(&product, id).Error
+	// Find the updating user (validation)
+	exist, err := controllers.GetProduct(id, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
+		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
-				"Failed to fetch product",
 				err.Error(),
 			}))
 		return
 	}
-	if product == (models.Product{}) {
-		c.JSON(http.StatusNotFound,
+
+	enough, err := validations.EnoughStock(exist.StockQuantity, body.Quantity)
+	if !enough {
+		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Product not found:",
+				err.Error(),
 			}))
 		return
 	}
 
-	newStock := product.StockQuantity - body.Quantity
+	newStock := exist.StockQuantity - body.Quantity
 
-	product.StockQuantity = newStock
-
-	// Save the updated product to the database
-	err = tx.Save(&product).Error
+	err = controllers.UpdateStock(newStock, exist, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
+		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Failed to update product",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Commit the transaction and check for commit errors
-	err = tx.Commit().Error
+	err = controllers.CommitTrx(c, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to commit transaction",
-				err.Error(),
-			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.UpdateSuccessResponse(&product),
+		responses.StockSuccess(),
 	)
 
 }
