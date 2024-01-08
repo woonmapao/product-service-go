@@ -26,6 +26,7 @@ func AddProductHandler(c *gin.Context) {
 
 	// Start a transaction
 	tx, err := controllers.StartTrx(c)
+	defer tx.Rollback()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
@@ -144,6 +145,7 @@ func UpdateProductHandler(c *gin.Context) {
 
 	// Start a transaction
 	tx, err := controllers.StartTrx(c)
+	defer tx.Rollback()
 	if err != nil {
 		return
 	}
@@ -209,6 +211,7 @@ func DeleteProduct(c *gin.Context) {
 
 	// Start a transaction
 	tx, err := controllers.StartTrx(c)
+	defer tx.Rollback()
 	if err != nil {
 		return
 	}
@@ -268,6 +271,7 @@ func UpdateStockHandler(c *gin.Context) {
 
 	// Start a transaction
 	tx, err := controllers.StartTrx(c)
+	defer tx.Rollback()
 	if err != nil {
 		return
 	}

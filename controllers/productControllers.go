@@ -48,7 +48,6 @@ func AddProduct(product *models.ProductRequest, tx *gorm.DB) error {
 	}
 	err := tx.Create(&adding).Error
 	if err != nil {
-		tx.Rollback()
 		return errors.New("failed to add product")
 	}
 	return nil
@@ -58,7 +57,6 @@ func CommitTrx(c *gin.Context, tx *gorm.DB) error {
 
 	err := tx.Commit().Error
 	if err != nil {
-		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				"Failed to commit transaction",
@@ -106,17 +104,15 @@ func GetProduct(id int, db *gorm.DB) (*models.Product, error) {
 
 func UpdateProduct(update *models.ProductRequest, exist *models.Product, tx *gorm.DB) error {
 
-	exist = &models.Product{
-		Name:          update.Name,
-		Category:      update.Category,
-		Price:         update.Price,
-		Description:   update.Description,
-		StockQuantity: update.StockQuantity,
-		ReorderLevel:  update.ReorderLevel,
-	}
+	exist.Name = update.Name
+	exist.Category = update.Category
+	exist.Price = update.Price
+	exist.Description = update.Description
+	exist.StockQuantity = update.StockQuantity
+	exist.ReorderLevel = update.ReorderLevel
+
 	err := tx.Save(&exist).Error
 	if err != nil {
-		tx.Rollback()
 		return errors.New("failed to update product")
 	}
 	return nil
@@ -128,7 +124,6 @@ func UpdateStock(newStock int, exist *models.Product, tx *gorm.DB) error {
 
 	err := tx.Save(&exist).Error
 	if err != nil {
-		tx.Rollback()
 		return errors.New("failed to update stock")
 	}
 	return nil
@@ -138,7 +133,6 @@ func DeleteProduct(id int, tx *gorm.DB) error {
 
 	err := tx.Delete(&models.Product{}, id).Error
 	if err != nil {
-		tx.Rollback()
 		return errors.New("failed to delete product")
 	}
 	return nil
