@@ -17,7 +17,7 @@ func DBInitializer() {
 	dsn := os.Getenv("DB_URL")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("failed to connect database", err)
+		log.Fatalf("failed to connect database: %v", err)
 	}
 
 	fmt.Println(`
@@ -40,7 +40,7 @@ func DBInitializer() {
 	var now time.Time
 	db.Raw("SELECT NOW()").Scan(&now)
 
-	fmt.Println(now)
+	log.Printf("Current database time: %v", now)
 
 	DB = db
 }

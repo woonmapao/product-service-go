@@ -26,7 +26,11 @@ func AddProductHandler(c *gin.Context) {
 
 	// Start a transaction
 	tx, err := controllers.StartTrx(c)
-	defer tx.Rollback()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
@@ -55,6 +59,7 @@ func AddProductHandler(c *gin.Context) {
 	// Add product to database
 	err = controllers.AddProduct(&body, tx)
 	if err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError,
 			responses.CreateErrorResponse([]string{
 				err.Error(),
@@ -286,7 +291,7 @@ func UpdateStockHandler(c *gin.Context) {
 		return
 	}
 
-	enough, err := validations.EnoughStock(exist.StockQuantity, body.Quantity)
+	enough, err := validations.EnoughStock(body.Quantity, exist.StockQuantity)
 	if !enough {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
