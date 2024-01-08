@@ -47,21 +47,10 @@ func UpdateSuccess() gin.H {
 	}
 }
 
-func DeleteSuccessResponse(product *models.Product) gin.H {
+func DeleteSuccess() gin.H {
 	return gin.H{
 		"status":  "success",
-		"message": "Product deleted successfully",
-		"data": gin.H{
-			"product": gin.H{
-				"id":            product.ID,
-				"name":          product.Name,
-				"category":      product.Category,
-				"price":         product.Price,
-				"description":   product.Description,
-				"stockQuantity": product.StockQuantity,
-				"reorderLevel":  product.ReorderLevel,
-			},
-		},
+		"message": "product deleted",
 	}
 }
 

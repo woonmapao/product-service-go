@@ -126,3 +126,13 @@ func UpdateProduct(update *models.ProductRequest, exist *models.Product, tx *gor
 	}
 	return nil
 }
+
+func DeleteProduct(id int, tx *gorm.DB) error {
+
+	err := tx.Delete(&models.Product{}, id).Error
+	if err != nil {
+		tx.Rollback()
+		return errors.New("failed to delete product")
+	}
+	return nil
+}

@@ -198,78 +198,50 @@ func UpdateProductHandler(c *gin.Context) {
 }
 
 func DeleteProduct(c *gin.Context) {
-	// Extract product ID from the request parameters
-	productID := c.Param("id")
 
-	// Convert product ID to integer (validations)
-	id, err := strconv.Atoi(productID)
+	id, err := controllers.GetID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest,
 			responses.CreateErrorResponse([]string{
-				"Invalid product ID",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Start a transaction
-	tx := initializer.DB.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to begin transaction",
-				tx.Error.Error(),
-			}))
+	tx, err := controllers.StartTrx(c)
+	if err != nil {
 		return
 	}
 
-	// Check if the product with the given ID exists
-	var product models.Product
-	err = tx.First(&product, id).Error
+	// Find the updating product (validation)
+	_, err = controllers.GetProduct(id, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
+		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
-				"Failed to fetch product",
 				err.Error(),
 			}))
 		return
 	}
-	if product == (models.Product{}) {
+
+	err = controllers.DeleteProduct(id, tx)
+	if err != nil {
 		c.JSON(http.StatusNotFound,
 			responses.CreateErrorResponse([]string{
-				"Product not found",
-			}))
-		return
-	}
-
-	// Delete the product
-	err = tx.Delete(&models.Product{}, id).Error
-	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to delete product",
 				err.Error(),
 			}))
 		return
 	}
 
 	// Commit the transaction and check for commit errors
-	err = tx.Commit().Error
+	err = controllers.CommitTrx(c, tx)
 	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError,
-			responses.CreateErrorResponse([]string{
-				"Failed to commit transaction",
-				err.Error(),
-			}))
 		return
 	}
 
 	// Return success response
 	c.JSON(http.StatusOK,
-		responses.DeleteSuccessResponse(&product),
+		responses.DeleteSuccess(),
 	)
 }
 
