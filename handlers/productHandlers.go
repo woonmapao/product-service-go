@@ -11,7 +11,7 @@ import (
 	"github.com/woonmapao/product-service-go/validations"
 )
 
-func AddProduct(c *gin.Context) {
+func AddProductHandler(c *gin.Context) {
 
 	// Get data from request body
 	var body models.ProductRequest
